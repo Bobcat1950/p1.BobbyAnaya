@@ -7,6 +7,8 @@ body, div, h1, h2, h3, h4, h5, h6, p, ul, ol, li, dl, dt, dd, img, form, fieldse
 
 html {
     height: 100%;
+	margin: auto;
+	width: 960px;
     overflow: auto; 
 }
 
@@ -14,7 +16,7 @@ body {
     background: #fff url(./style_bg.jpg) repeat;
     color: white;
     font-family: Arial, Helvetica, sans-serif; font-size: 18px; 
-    position: fixed;
+    position: absolute;
     width: 90%; 
     height: 95%;
     left: 4%;
