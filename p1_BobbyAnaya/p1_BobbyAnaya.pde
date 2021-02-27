@@ -3,7 +3,7 @@ boolean DoorOpen = false;
 boolean MicrowaveOn = false;
 boolean LightStatus = false;
 String Volume = "High"; //Mute, Low, High
-int FontSize = 10; //0-Small 5-Medium 10-Large
+int FontSize = 0; //0-Small 5-Medium 10-Large
 boolean Locked = false;
 boolean DefaultState = true;
 boolean CookingState = false;
@@ -358,8 +358,6 @@ void draw(){
 void update(){
   if(CookingState){
     MicrowaveOn = CookingState;
-  }else if(TimerState){
-    MicrowaveOn = TimerState; //Temporary to test Timer
   }else if(DefaultState){
     MicrowaveOn = !DefaultState;
   }else if(ResetTimerState){
@@ -433,10 +431,13 @@ void update(){
     Locked = false;
     TimerState = false;
     ResetTimerState = true;
-    if(LightStatus)
+    if(LightStatus && !TimerState)
     {
       insideColor = color(118,236,240);
     }
+  }
+  if(TimerState){
+    insideColor = color(195);
   }
   if(!DoorOpen && overHandle(handleX, handleY, handleXSize, handleYSize) ){
     handleOver = true;
