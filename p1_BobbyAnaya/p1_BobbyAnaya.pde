@@ -2,9 +2,19 @@
 boolean DoorOpen = false;
 boolean MicrowaveOn = false;
 boolean LightStatus = false;
-int Volume = 0;
-int FontSize = 0;
+String Volume = "High"; //Mute, Low, High
+int FontSize = 10; //0-Small 5-Medium 10-Large
 boolean Locked = false;
+boolean DefaultState = true;
+boolean CookingState = false;
+boolean TimerState = false;
+boolean ClockSet = false;
+boolean ResetTimerState = false;
+int cookTimeStage = 0;
+int timerTimeStage = 0;
+int clockTimeStage = 0;
+boolean AM = true;
+String ClockTime;
 
 //Microwave Door Setup
 int baseX, baseY, doorX, doorY, windowX, windowY, handleX, handleY, doorOpenY,handleOpenY;
@@ -20,8 +30,9 @@ int handleXSize = 560;
 int handleYSize = 16;
 color selectedColor;
 color DefButColor, StartColor, StopColor, BaseColor, insideColor,currentColor, 
-handleColor, insideOnColor, screenColor, displayColor, openColor;
-color DefButHighlight, StartHighlight, StopHighlight, handleHighlight, openHighlight;
+handleColor, insideOnColor, screenColor, displayColor, openColor,endLightOn;
+color DefButHighlight, StartHighlight, StopHighlight, handleHighlight, openHighlight, 
+endLightOnHighlight;
 
 //Mouse Hovers
 boolean handleOver, openButtonOver, startOver, stopOver, oneOver, twoOver, threeOver, fourOver,
@@ -55,8 +66,22 @@ int openX, openY, startX, startY, stopX, stopY;
 int startstopSize = 75;
 int openSize = 100;
 
+//Time values
+int CookTimeMinutes, CookTimeSeconds, TimerMinutes, TimerSeconds;
+int ClockHours = 0;
+int ClockMinutes = 0;
+int ClockSeconds = 0;
+String ClockNotSet = "Set Clock Please";
+int time;
+int clockTime;
+int secondsRemaining;
+int tenMinutes,singleMinutes,tenSeconds,singleSeconds;
+
 void setup(){
   size(1500,800);
+  time = millis();
+  clockTime = millis();
+  CookTimeMinutes = CookTimeSeconds = TimerMinutes = TimerSeconds = 0;
   handleOver=openButtonOver=startOver=stopOver=oneOver=twoOver=threeOver=fourOver=fiveOver=
   sixOver=sevenOver=eightOver=nineOver=cookTimeOver=zeroOver=add30sOver=endLightOver=volumeOver
   =dispButtonOver=resetTimerOver=setTimerOver=ampmOver=setClockOver=false;
@@ -115,6 +140,8 @@ void setup(){
   StartHighlight = color(16,223,64);
   StopColor = color(189,29,29);
   StopHighlight = color(229,36,36);
+  endLightOn = color(137,209,212);
+  endLightOnHighlight = color(181,242,245);
   stroke(0);
 }
 
@@ -137,8 +164,7 @@ void draw(){
       fill(insideOnColor);
     }
     rect(windowX, windowY, windowXSize, windowYSize, windowCornerRad);
-  }
-  else{
+  }else{
     fill(insideColor);
     rect(doorX,doorY, doorXSize, doorYSize);
     fill(BaseColor);
@@ -187,7 +213,11 @@ void draw(){
   rect(zeroX, zeroY, keypadButtonSize, keypadButtonSize);
   fill(add30sOver ? DefButHighlight : DefButColor);
   rect(add30sX, add30sY, keypadButtonSize, keypadButtonSize);
+  if(LightStatus){
+    fill(endLightOver ? endLightOnHighlight : endLightOn);
+  }else{
   fill(endLightOver ? DefButHighlight : DefButColor);
+  }
   rect(endLightX, endLightY, accessButtonSize, accessButtonSize);
   fill(volumeOver ? DefButHighlight : DefButColor);
   rect(volumeX, volumeY, accessButtonSize, accessButtonSize);
@@ -228,9 +258,186 @@ void draw(){
   text("Volume\nOptions",volumeX+35, volumeY+35);
   text("Display\nSize", dispButtonX+35, dispButtonY+35);
   
+  //Setting up Display
+  if(DefaultState){
+    if(!ClockSet){
+      textSize(25 + FontSize);
+      text(ClockNotSet, displayX+145, displayY+50);
+    }
+    else if(ClockSet){
+      textSize(25 + 3*FontSize);
+      ClockTime = ClockHours + ":" + (ClockMinutes < 10 ? "0" : "") + ClockMinutes;
+      if(AM){
+        text(ClockTime + "  AM", displayX+145, displayY+50);
+      }
+      else{
+        text(ClockTime + "  PM", displayX+145, displayY+50);
+      }
+    }
+  }
+  if(CookingState){
+    textSize(25 + 4*FontSize);
+    text(CookTimeMinutes + ":" + (CookTimeSeconds<10 ? "0" : "") + CookTimeSeconds, displayX+145, displayY+50);
+  }
+  if(TimerState){
+    textSize(25 + 4*FontSize);
+    text(TimerMinutes + ":" + (TimerSeconds<10 ? "0" : "") + TimerSeconds, displayX+145, displayY+50);
+  }
+  if(ResetTimerState){
+    textSize(25 + 2*FontSize);
+    text("Reset Timer?", displayX+145, displayY+50);
+  }
+  switch(cookTimeStage){
+    case 1:
+      textSize(25 + 5*FontSize);
+      text("__:__", displayX+145, displayY+50);
+      break;
+    case 2:
+      textSize(25 + 5*FontSize);
+      text(tenMinutes + "_:__", displayX+145, displayY+50);
+      break;
+    case 3:
+      textSize(25 + 5*FontSize);
+      text(tenMinutes + "" + singleMinutes + ":__", displayX+145, displayY+50);
+      break;
+    case 4:
+      textSize(25 + 5*FontSize);
+      text(tenMinutes + "" + singleMinutes + ":" + tenSeconds + "_", displayX+145, displayY+50);
+      break;
+    case 5:
+      textSize(25 + 5*FontSize);
+      text(tenMinutes + "" + singleMinutes + ":" + tenSeconds + "" + singleSeconds, displayX+145, displayY+50);
+      break;
+  }
+  switch(timerTimeStage){
+    case 1:
+      textSize(25 + 5*FontSize);
+      text("__:__", displayX+145, displayY+50);
+      break;
+    case 2:
+      textSize(25 + 5*FontSize);
+      text(tenMinutes + "_:__", displayX+145, displayY+50);
+      break;
+    case 3:
+      textSize(25 + 5*FontSize);
+      text(tenMinutes + "" + singleMinutes + ":__", displayX+145, displayY+50);
+      break;
+    case 4:
+      textSize(25 + 5*FontSize);
+      text(tenMinutes + "" + singleMinutes + ":" + tenSeconds + "_", displayX+145, displayY+50);
+      break;
+    case 5:
+      textSize(25 + 5*FontSize);
+      text(tenMinutes + "" + singleMinutes + ":" + tenSeconds + "" + singleSeconds, displayX+145, displayY+50);
+      break;
+  }
+  switch(clockTimeStage){
+    case 1:
+      textSize(25 + 5*FontSize);
+      text("__:__", displayX+145, displayY+50);
+      break;
+    case 2:
+      textSize(25 + 5*FontSize);
+      text(tenMinutes + "_:__", displayX+145, displayY+50);
+      break;
+    case 3:
+      textSize(25 + 5*FontSize);
+      text(tenMinutes + "" + singleMinutes + ":__", displayX+145, displayY+50);
+      break;
+    case 4:
+      textSize(25 + 5*FontSize);
+      text(tenMinutes + "" + singleMinutes + ":" + tenSeconds + "_", displayX+145, displayY+50);
+      break;
+    case 5:
+      textSize(25 + 5*FontSize);
+      text(tenMinutes + "" + singleMinutes + ":" + tenSeconds + "" + singleSeconds, displayX+145, displayY+50);
+      break;
+  }
 }
 
 void update(){
+  if(CookingState){
+    MicrowaveOn = CookingState;
+  }else if(TimerState){
+    MicrowaveOn = TimerState; //Temporary to test Timer
+  }else if(DefaultState){
+    MicrowaveOn = !DefaultState;
+  }else if(ResetTimerState){
+    MicrowaveOn = !ResetTimerState;
+  }
+  if(CookingState){
+    if(secondcheck()){
+      CookTimeSeconds -= 1;
+    }
+  }else if(TimerState){
+    if(secondcheck()){
+      TimerSeconds -= 1;
+    }
+  }
+  if(ClockSet){
+    if(clockTickCheck()){
+      ClockSeconds += 1;
+    }
+  }
+  if(CookingState){
+    secondsRemaining = CookTimeSeconds + (CookTimeMinutes*60);
+  }else if(TimerState){
+    secondsRemaining = TimerSeconds + (TimerMinutes*60);
+  }
+  if(ClockSeconds >= 60){
+    ClockMinutes += ClockSeconds/60;
+    ClockSeconds = ClockSeconds%60;
+  }
+  if(ClockMinutes >= 60){
+    ClockHours += ClockMinutes/60;
+    ClockMinutes = ClockMinutes%60;
+  }
+  if(ClockHours >= 13){
+    ClockHours = ClockHours%13;
+  }
+  if(ClockHours == 0){
+    ClockHours += 1;
+  }
+  if(CookTimeSeconds >=60){
+    CookTimeMinutes += CookTimeSeconds/60;
+    CookTimeSeconds = CookTimeSeconds%60;
+  }
+  if(CookTimeMinutes >=60){
+    CookTimeMinutes = CookTimeMinutes%60;
+  }
+  if(CookTimeSeconds < 0 && CookTimeMinutes > 0){
+    CookTimeMinutes -= 1;
+    CookTimeSeconds +=60;
+  }
+  if(TimerSeconds >=60){
+    TimerMinutes += TimerSeconds/60;
+    TimerSeconds = TimerSeconds%60;
+  }
+  if(TimerMinutes >=60){
+    TimerMinutes = TimerMinutes%60;
+  }
+  if(TimerSeconds < 0 && TimerMinutes > 0){
+    TimerMinutes -= 1;
+    TimerSeconds +=59;
+  }
+  if(CookingState && secondsRemaining <= 0){
+    Locked = false;
+    CookingState = false;
+    DefaultState = true;
+    if(LightStatus)
+    {
+      insideColor = color(118,236,240);
+    }
+  }
+  if(TimerState && secondsRemaining <= 0){
+    Locked = false;
+    TimerState = false;
+    ResetTimerState = true;
+    if(LightStatus)
+    {
+      insideColor = color(118,236,240);
+    }
+  }
   if(!DoorOpen && overHandle(handleX, handleY, handleXSize, handleYSize) ){
     handleOver = true;
   }
@@ -265,23 +472,752 @@ void update(){
 }
 
 void mousePressed(){
-  if(!DoorOpen && overHandle(handleX, handleY, handleXSize, handleYSize) ){
+  if(!DoorOpen && overHandle(handleX, handleY, handleXSize, handleYSize) && !Locked ){
     DoorOpen = true;
   }
   else if(DoorOpen && overHandle(handleX, handleOpenY, handleXSize, handleYSize) ){
     DoorOpen = false;
   }
-  if(overOpen(openX, openY, openSize))
+  if(overOpen(openX, openY, openSize) && !Locked)
   {
     DoorOpen = !DoorOpen;
   }
-}
+  if(overButton(oneX, oneY, keypadButtonSize, keypadButtonSize) && DefaultState && !DoorOpen){
+    CookTimeMinutes = 1;
+    DefaultState = false;
+    CookingState = true;
+    Locked = true;
+    time = millis()/1000;
+  }else if(overButton(twoX, twoY, keypadButtonSize, keypadButtonSize) && DefaultState && !DoorOpen){
+    CookTimeMinutes = 2;
+    DefaultState = false;
+    CookingState = true;
+    Locked = true;
+    time = millis()/1000;
+  }else if(overButton(threeX, threeY, keypadButtonSize, keypadButtonSize) && DefaultState && !DoorOpen){
+    CookTimeMinutes = 3;
+    DefaultState = false;
+    CookingState = true;
+    Locked = true;
+    time = millis()/1000;
+  }else if(overButton(fourX, fourY, keypadButtonSize, keypadButtonSize) && DefaultState && !DoorOpen){
+    CookTimeMinutes = 4;
+    DefaultState = false;
+    CookingState = true;
+    Locked = true;
+    time = millis()/1000;
+  }else if(overButton(fiveX, fiveY, keypadButtonSize, keypadButtonSize) && DefaultState && !DoorOpen){
+    CookTimeMinutes = 5;
+    DefaultState = false;
+    CookingState = true;
+    Locked = true;
+    time = millis()/1000;
+  }else if(overButton(sixX, sixY, keypadButtonSize, keypadButtonSize) && DefaultState && !DoorOpen){
+    CookTimeMinutes = 6;
+    DefaultState = false;
+    CookingState = true;
+    Locked = true;
+    time = millis()/1000;
+  }else if(overButton(sevenX, sevenY, keypadButtonSize, keypadButtonSize) && DefaultState && !DoorOpen){
+    CookTimeMinutes = 7;
+    DefaultState = false;
+    CookingState = true;
+    Locked = true;
+    time = millis()/1000;
+  }else if(overButton(eightX, eightY, keypadButtonSize, keypadButtonSize) && DefaultState && !DoorOpen){
+    CookTimeMinutes = 8;
+    DefaultState = false;
+    CookingState = true;
+    Locked = true;
+    time = millis()/1000;
+  }else if(overButton(nineX, nineY, keypadButtonSize, keypadButtonSize) && DefaultState && !DoorOpen){
+    CookTimeMinutes = 9;
+    DefaultState = false;
+    CookingState = true;
+    Locked = true;
+    time = millis()/1000;
+  }else if(overButton(add30sX, add30sY, keypadButtonSize, keypadButtonSize) && DefaultState && !DoorOpen){
+    CookTimeSeconds = 30;
+    DefaultState = false;
+    CookingState = true;
+    Locked = true;
+    time = millis()/1000;
+  }else if(overButton(add30sX, add30sY, keypadButtonSize, keypadButtonSize) && CookingState && !DoorOpen){
+    CookTimeSeconds += 30;
+  }else if(overButton(startX, startY, startstopSize, startstopSize) && cookTimeStage == 5 && !DoorOpen){
+    Locked = true;
+    CookingState = true;
+    cookTimeStage = 0;
+    CookTimeMinutes = tenMinutes*10 + singleMinutes;
+    CookTimeSeconds = tenSeconds*10 + singleSeconds;
+    time = millis()/1000;
+  }else if(overButton(startX, startY, startstopSize, startstopSize) && timerTimeStage == 5){
+    TimerState = true;
+    timerTimeStage = 0;
+    TimerMinutes = tenMinutes*10 + singleMinutes;
+    TimerSeconds = tenSeconds*10 + singleSeconds;
+    time = millis()/1000;
+  }else if(overButton(startX, startY, startstopSize, startstopSize) && clockTimeStage == 5){
+    ClockSet = true;
+    DefaultState = true;
+    clockTimeStage = 0;
+    ClockHours = tenMinutes*10 + singleMinutes;
+    ClockMinutes = tenSeconds*10 + singleSeconds;
+    ClockSeconds = 0;
+    clockTime = millis()/1000;
+  }else if(overButton(startX, startY, startstopSize, startstopSize) && DefaultState && !DoorOpen){
+    Locked = true;
+  }else if(overButton(stopX, stopY, startstopSize, startstopSize)){
+    Locked = false;
+    CookTimeMinutes = 0;
+    CookTimeSeconds = 0;
+    TimerMinutes = 0;
+    TimerSeconds = 0;
+    CookingState = false;
+    TimerState = false;
+    ResetTimerState = false;
+    cookTimeStage = 0;
+    timerTimeStage = 0;
+    clockTimeStage = 0;
+    DefaultState = true;
+    insideColor = color(195);
+  }else if(overButton(ampmX, ampmY, timerButtonSize, timerButtonSize)){
+    AM = !AM;
+  }else if(overButton(endLightX, endLightY, accessButtonSize, accessButtonSize)){
+    LightStatus = !LightStatus;
+  }else if(overButton(volumeX, volumeY, accessButtonSize, accessButtonSize)){
+    if(Volume == "High"){
+      Volume = "Low";
+    }else if(Volume == "Low"){
+      Volume = "Mute";
+    }else if(Volume == "Mute"){
+      Volume = "High";
+    }
+  }else if(overButton(dispButtonX, dispButtonY, accessButtonSize, accessButtonSize)){
+    if(FontSize == 0){
+      FontSize = 5;
+    }else if(FontSize == 5){
+      FontSize = 10;
+    }else if(FontSize == 10){
+      FontSize = 0;
+    }
+  }else if(overButton(cookTimeX, cookTimeY, keypadButtonSize, keypadButtonSize) && DefaultState && !DoorOpen){
+    cookTimeStage += 1;
+    DefaultState = false;
+  }else if(overButton(setTimerX, setTimerY, timerButtonSize, timerButtonSize) && DefaultState){
+    timerTimeStage += 1;
+    DefaultState = false;
+  }else if(overButton(resetTimerX, resetTimerY, timerButtonSize, timerButtonSize) && ResetTimerState){
+    TimerState = true;
+    ResetTimerState = false;
+    TimerMinutes = tenMinutes*10 + singleMinutes;
+    TimerSeconds = tenSeconds*10 + singleSeconds;
+    time = millis()/1000;
+  }else if(overButton(setClockX, setClockY, timerButtonSize, timerButtonSize) && DefaultState){
+    clockTimeStage += 1;
+    DefaultState = false;
+  }//Setting Cook Time
+  else if(overButton(zeroX, zeroY, keypadButtonSize, keypadButtonSize) && (cookTimeStage>0) && !DoorOpen){
+    switch(cookTimeStage){
+      case 1:
+        tenMinutes = 0;
+        cookTimeStage += 1;
+        break;
+      case 2:
+        singleMinutes = 0;
+        cookTimeStage += 1;
+        break;
+      case 3:
+        tenSeconds = 0;
+        cookTimeStage +=1;
+        break;
+      case 4:
+        singleSeconds = 0;
+        cookTimeStage += 1;
+        break;
+      }
+    }else if(overButton(oneX, oneY, keypadButtonSize, keypadButtonSize) && (cookTimeStage>0) && !DoorOpen){
+    switch(cookTimeStage){
+      case 1:
+        tenMinutes = 1;
+        cookTimeStage += 1;
+        break;
+      case 2:
+        singleMinutes = 1;
+        cookTimeStage += 1;
+        break;
+      case 3:
+        tenSeconds = 1;
+        cookTimeStage +=1;
+        break;
+      case 4:
+        singleSeconds = 1;
+        cookTimeStage += 1;
+        break;
+      }
+    }else if(overButton(twoX, twoY, keypadButtonSize, keypadButtonSize) && (cookTimeStage>0) && !DoorOpen){
+    switch(cookTimeStage){
+      case 1:
+        tenMinutes = 2;
+        cookTimeStage += 1;
+        break;
+      case 2:
+        singleMinutes = 2;
+        cookTimeStage += 1;
+        break;
+      case 3:
+        tenSeconds = 2;
+        cookTimeStage +=1;
+        break;
+      case 4:
+        singleSeconds = 2;
+        cookTimeStage += 1;
+        break;
+      }
+    }else if(overButton(threeX, threeY, keypadButtonSize, keypadButtonSize) && (cookTimeStage>0) && !DoorOpen){
+    switch(cookTimeStage){
+      case 1:
+        tenMinutes = 3;
+        cookTimeStage += 1;
+        break;
+      case 2:
+        singleMinutes = 3;
+        cookTimeStage += 1;
+        break;
+      case 3:
+        tenSeconds = 3;
+        cookTimeStage +=1;
+        break;
+      case 4:
+        singleSeconds = 3;
+        cookTimeStage += 1;
+        break;
+      }
+    }else if(overButton(fourX, fourY, keypadButtonSize, keypadButtonSize) && (cookTimeStage>0) && !DoorOpen){
+    switch(cookTimeStage){
+      case 1:
+        tenMinutes = 4;
+        cookTimeStage += 1;
+        break;
+      case 2:
+        singleMinutes = 4;
+        cookTimeStage += 1;
+        break;
+      case 3:
+        tenSeconds = 4;
+        cookTimeStage +=1;
+        break;
+      case 4:
+        singleSeconds = 4;
+        cookTimeStage += 1;
+        break;
+      }
+    }else if(overButton(fiveX, fiveY, keypadButtonSize, keypadButtonSize) && (cookTimeStage>0) && !DoorOpen){
+    switch(cookTimeStage){
+      case 1:
+        tenMinutes = 5;
+        cookTimeStage += 1;
+        break;
+      case 2:
+        singleMinutes = 5;
+        cookTimeStage += 1;
+        break;
+      case 3:
+        tenSeconds = 5;
+        cookTimeStage +=1;
+        break;
+      case 4:
+        singleSeconds = 5;
+        cookTimeStage += 1;
+        break;
+      }
+    }else if(overButton(sixX, sixY, keypadButtonSize, keypadButtonSize) && (cookTimeStage>0) && !DoorOpen){
+    switch(cookTimeStage){
+      case 1:
+        tenMinutes = 6;
+        cookTimeStage += 1;
+        break;
+      case 2:
+        singleMinutes = 6;
+        cookTimeStage += 1;
+        break;
+      case 3:
+        tenSeconds = 6;
+        cookTimeStage +=1;
+        break;
+      case 4:
+        singleSeconds = 6;
+        cookTimeStage += 1;
+        break;
+      }
+    }else if(overButton(sevenX, sevenY, keypadButtonSize, keypadButtonSize) && (cookTimeStage>0) && !DoorOpen){
+    switch(cookTimeStage){
+      case 1:
+        tenMinutes = 7;
+        cookTimeStage += 1;
+        break;
+      case 2:
+        singleMinutes = 7;
+        cookTimeStage += 1;
+        break;
+      case 3:
+        tenSeconds = 7;
+        cookTimeStage +=1;
+        break;
+      case 4:
+        singleSeconds = 7;
+        cookTimeStage += 1;
+        break;
+      }
+    }else if(overButton(eightX, eightY, keypadButtonSize, keypadButtonSize) && (cookTimeStage>0) && !DoorOpen){
+    switch(cookTimeStage){
+      case 1:
+        tenMinutes = 8;
+        cookTimeStage += 1;
+        break;
+      case 2:
+        singleMinutes = 8;
+        cookTimeStage += 1;
+        break;
+      case 3:
+        tenSeconds = 8;
+        cookTimeStage +=1;
+        break;
+      case 4:
+        singleSeconds = 8;
+        cookTimeStage += 1;
+        break;
+      }
+    }else if(overButton(nineX, nineY, keypadButtonSize, keypadButtonSize) && (cookTimeStage>0) && !DoorOpen){
+    switch(cookTimeStage){
+      case 1:
+        tenMinutes = 9;
+        cookTimeStage += 1;
+        break;
+      case 2:
+        singleMinutes = 9;
+        cookTimeStage += 1;
+        break;
+      case 3:
+        tenSeconds = 9;
+        cookTimeStage +=1;
+        break;
+      case 4:
+        singleSeconds = 9;
+        cookTimeStage += 1;
+        break;
+      }
+    }//Setting Timer
+    else if(overButton(zeroX, zeroY, keypadButtonSize, keypadButtonSize) && (timerTimeStage>0)){
+    switch(timerTimeStage){
+      case 1:
+        tenMinutes = 0;
+        timerTimeStage += 1;
+        break;
+      case 2:
+        singleMinutes = 0;
+        timerTimeStage += 1;
+        break;
+      case 3:
+        tenSeconds = 0;
+        timerTimeStage +=1;
+        break;
+      case 4:
+        singleSeconds = 0;
+        timerTimeStage += 1;
+        break;
+      }
+    }else if(overButton(oneX, oneY, keypadButtonSize, keypadButtonSize) && (timerTimeStage>0)){
+    switch(timerTimeStage){
+      case 1:
+        tenMinutes = 1;
+        timerTimeStage += 1;
+        break;
+      case 2:
+        singleMinutes = 1;
+        timerTimeStage += 1;
+        break;
+      case 3:
+        tenSeconds = 1;
+        timerTimeStage +=1;
+        break;
+      case 4:
+        singleSeconds = 1;
+        timerTimeStage += 1;
+        break;
+      }
+    }else if(overButton(twoX, twoY, keypadButtonSize, keypadButtonSize) && (timerTimeStage>0)){
+    switch(timerTimeStage){
+      case 1:
+        tenMinutes = 2;
+        timerTimeStage += 1;
+        break;
+      case 2:
+        singleMinutes = 2;
+        timerTimeStage += 1;
+        break;
+      case 3:
+        tenSeconds = 2;
+        timerTimeStage +=1;
+        break;
+      case 4:
+        singleSeconds = 2;
+        timerTimeStage += 1;
+        break;
+      }
+    }else if(overButton(threeX, threeY, keypadButtonSize, keypadButtonSize) && (timerTimeStage>0)){
+    switch(timerTimeStage){
+      case 1:
+        tenMinutes = 3;
+        timerTimeStage += 1;
+        break;
+      case 2:
+        singleMinutes = 3;
+        timerTimeStage += 1;
+        break;
+      case 3:
+        tenSeconds = 3;
+        timerTimeStage +=1;
+        break;
+      case 4:
+        singleSeconds = 3;
+        timerTimeStage += 1;
+        break;
+      }
+    }else if(overButton(fourX, fourY, keypadButtonSize, keypadButtonSize) && (timerTimeStage>0)){
+    switch(timerTimeStage){
+      case 1:
+        tenMinutes = 4;
+        timerTimeStage += 1;
+        break;
+      case 2:
+        singleMinutes = 4;
+        timerTimeStage += 1;
+        break;
+      case 3:
+        tenSeconds = 4;
+        timerTimeStage +=1;
+        break;
+      case 4:
+        singleSeconds = 4;
+        timerTimeStage += 1;
+        break;
+      }
+    }else if(overButton(fiveX, fiveY, keypadButtonSize, keypadButtonSize) && (timerTimeStage>0)){
+    switch(timerTimeStage){
+      case 1:
+        tenMinutes = 5;
+        timerTimeStage += 1;
+        break;
+      case 2:
+        singleMinutes = 5;
+        timerTimeStage += 1;
+        break;
+      case 3:
+        tenSeconds = 5;
+        timerTimeStage +=1;
+        break;
+      case 4:
+        singleSeconds = 5;
+        timerTimeStage += 1;
+        break;
+      }
+    }else if(overButton(sixX, sixY, keypadButtonSize, keypadButtonSize) && (timerTimeStage>0)){
+    switch(timerTimeStage){
+      case 1:
+        tenMinutes = 6;
+        timerTimeStage += 1;
+        break;
+      case 2:
+        singleMinutes = 6;
+        timerTimeStage += 1;
+        break;
+      case 3:
+        tenSeconds = 6;
+        timerTimeStage +=1;
+        break;
+      case 4:
+        singleSeconds = 6;
+        timerTimeStage += 1;
+        break;
+      }
+    }else if(overButton(sevenX, sevenY, keypadButtonSize, keypadButtonSize) && (timerTimeStage>0)){
+    switch(timerTimeStage){
+      case 1:
+        tenMinutes = 7;
+        timerTimeStage += 1;
+        break;
+      case 2:
+        singleMinutes = 7;
+        timerTimeStage += 1;
+        break;
+      case 3:
+        tenSeconds = 7;
+        timerTimeStage +=1;
+        break;
+      case 4:
+        singleSeconds = 7;
+        timerTimeStage += 1;
+        break;
+      }
+    }else if(overButton(eightX, eightY, keypadButtonSize, keypadButtonSize) && (timerTimeStage>0)){
+    switch(timerTimeStage){
+      case 1:
+        tenMinutes = 8;
+        timerTimeStage += 1;
+        break;
+      case 2:
+        singleMinutes = 8;
+        timerTimeStage += 1;
+        break;
+      case 3:
+        tenSeconds = 8;
+        timerTimeStage +=1;
+        break;
+      case 4:
+        singleSeconds = 8;
+        timerTimeStage += 1;
+        break;
+      }
+    }else if(overButton(nineX, nineY, keypadButtonSize, keypadButtonSize) && (timerTimeStage>0)){
+    switch(timerTimeStage){
+      case 1:
+        tenMinutes = 9;
+        timerTimeStage += 1;
+        break;
+      case 2:
+        singleMinutes = 9;
+        timerTimeStage += 1;
+        break;
+      case 3:
+        tenSeconds = 9;
+        timerTimeStage +=1;
+        break;
+      case 4:
+        singleSeconds = 9;
+        timerTimeStage += 1;
+        break;
+      }
+    }else if(overButton(zeroX, zeroY, keypadButtonSize, keypadButtonSize) && (clockTimeStage>0)){
+    switch(clockTimeStage){
+      case 1:
+        tenMinutes = 0;
+        clockTimeStage += 1;
+        break;
+      case 2:
+        singleMinutes = 0;
+        clockTimeStage += 1;
+        break;
+      case 3:
+        tenSeconds = 0;
+        clockTimeStage +=1;
+        break;
+      case 4:
+        singleSeconds = 0;
+        clockTimeStage += 1;
+        break;
+      }
+    }else if(overButton(oneX, oneY, keypadButtonSize, keypadButtonSize) && (clockTimeStage>0)){
+    switch(clockTimeStage){
+      case 1:
+        tenMinutes = 1;
+        clockTimeStage += 1;
+        break;
+      case 2:
+        singleMinutes = 1;
+        clockTimeStage += 1;
+        break;
+      case 3:
+        tenSeconds = 1;
+        clockTimeStage +=1;
+        break;
+      case 4:
+        singleSeconds = 1;
+        clockTimeStage += 1;
+        break;
+      }
+    }else if(overButton(twoX, twoY, keypadButtonSize, keypadButtonSize) && (clockTimeStage>0)){
+    switch(clockTimeStage){
+      case 1:
+        tenMinutes = 2;
+        clockTimeStage += 1;
+        break;
+      case 2:
+        singleMinutes = 2;
+        clockTimeStage += 1;
+        break;
+      case 3:
+        tenSeconds = 2;
+        clockTimeStage +=1;
+        break;
+      case 4:
+        singleSeconds = 2;
+        clockTimeStage += 1;
+        break;
+      }
+    }else if(overButton(threeX, threeY, keypadButtonSize, keypadButtonSize) && (clockTimeStage>0)){
+    switch(clockTimeStage){
+      case 1:
+        tenMinutes = 3;
+        clockTimeStage += 1;
+        break;
+      case 2:
+        singleMinutes = 3;
+        clockTimeStage += 1;
+        break;
+      case 3:
+        tenSeconds = 3;
+        clockTimeStage +=1;
+        break;
+      case 4:
+        singleSeconds = 3;
+        clockTimeStage += 1;
+        break;
+      }
+    }else if(overButton(fourX, fourY, keypadButtonSize, keypadButtonSize) && (clockTimeStage>0)){
+    switch(clockTimeStage){
+      case 1:
+        tenMinutes = 4;
+        clockTimeStage += 1;
+        break;
+      case 2:
+        singleMinutes = 4;
+        clockTimeStage += 1;
+        break;
+      case 3:
+        tenSeconds = 4;
+        clockTimeStage +=1;
+        break;
+      case 4:
+        singleSeconds = 4;
+        clockTimeStage += 1;
+        break;
+      }
+    }else if(overButton(fiveX, fiveY, keypadButtonSize, keypadButtonSize) && (clockTimeStage>0)){
+    switch(clockTimeStage){
+      case 1:
+        tenMinutes = 5;
+        clockTimeStage += 1;
+        break;
+      case 2:
+        singleMinutes = 5;
+        clockTimeStage += 1;
+        break;
+      case 3:
+        tenSeconds = 5;
+        clockTimeStage +=1;
+        break;
+      case 4:
+        singleSeconds = 5;
+        clockTimeStage += 1;
+        break;
+      }
+    }else if(overButton(sixX, sixY, keypadButtonSize, keypadButtonSize) && (clockTimeStage>0)){
+    switch(clockTimeStage){
+      case 1:
+        tenMinutes = 6;
+        clockTimeStage += 1;
+        break;
+      case 2:
+        singleMinutes = 6;
+        clockTimeStage += 1;
+        break;
+      case 3:
+        tenSeconds = 6;
+        clockTimeStage +=1;
+        break;
+      case 4:
+        singleSeconds = 6;
+        clockTimeStage += 1;
+        break;
+      }
+    }else if(overButton(sevenX, sevenY, keypadButtonSize, keypadButtonSize) && (clockTimeStage>0)){
+    switch(clockTimeStage){
+      case 1:
+        tenMinutes = 7;
+        clockTimeStage += 1;
+        break;
+      case 2:
+        singleMinutes = 7;
+        clockTimeStage += 1;
+        break;
+      case 3:
+        tenSeconds = 7;
+        clockTimeStage +=1;
+        break;
+      case 4:
+        singleSeconds = 7;
+        clockTimeStage += 1;
+        break;
+      }
+    }else if(overButton(eightX, eightY, keypadButtonSize, keypadButtonSize) && (clockTimeStage>0)){
+    switch(clockTimeStage){
+      case 1:
+        tenMinutes = 8;
+        clockTimeStage += 1;
+        break;
+      case 2:
+        singleMinutes = 8;
+        clockTimeStage += 1;
+        break;
+      case 3:
+        tenSeconds = 8;
+        clockTimeStage +=1;
+        break;
+      case 4:
+        singleSeconds = 8;
+        clockTimeStage += 1;
+        break;
+      }
+    }else if(overButton(nineX, nineY, keypadButtonSize, keypadButtonSize) && (clockTimeStage>0)){
+    switch(clockTimeStage){
+      case 1:
+        tenMinutes = 9;
+        clockTimeStage += 1;
+        break;
+      case 2:
+        singleMinutes = 9;
+        clockTimeStage += 1;
+        break;
+      case 3:
+        tenSeconds = 9;
+        clockTimeStage +=1;
+        break;
+      case 4:
+        singleSeconds = 9;
+        clockTimeStage += 1;
+        break;
+      }
+    }
+  }
 
 boolean overHandle(int x, int y, int w, int h){
   if(mouseX >= x && mouseX <= x+w && mouseY >= y && mouseY <= y+h){
     return true;
   }
   else{
+    return false;
+  }
+}
+
+boolean secondcheck(){
+  if(((millis()/1000) - time) >= 1){
+    time = millis()/1000;
+    return true;
+  }
+  else{
+    return false;
+  }
+}
+
+boolean clockTickCheck(){
+  if(((millis()/1000) - clockTime) >= 1){
+    clockTime = millis()/1000;
+    if(ClockHours == 11 && ClockMinutes == 59 && ClockSeconds == 59){
+      AM = !AM;
+    }
+    return true;
+  }else{
     return false;
   }
 }
